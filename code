@@ -1,0 +1,145 @@
+import tkinter as tk
+from tkinter import scrolledtext, messagebox
+import heapq
+from collections import Counter
+import random
+
+# Node structure for Huffman Tree
+class Node:
+    def __init__(self, char, freq):
+        self.char = char
+        self.freq = freq
+        self.left = None
+        self.right = None
+    
+    def __lt__(self, other):
+        return self.freq < other.freq
+
+# Huffman Coding Class
+class HuffmanCoding:
+    def __init__(self, text):
+        self.text = text
+        self.frequency = Counter(text)
+        self.codes = {}
+        self.tree = None
+        self.merge_steps = []  # To store steps for animation
+
+    def build_tree(self):
+        heap = [Node(char, freq) for char, freq in self.frequency.items()]
+        heapq.heapify(heap)
+        
+        while len(heap) > 1:
+            node1 = heapq.heappop(heap)
+            node2 = heapq.heappop(heap)
+            merged = Node(None, node1.freq + node2.freq)
+            merged.left = node1
+            merged.right = node2
+            heapq.heappush(heap, merged)
+
+            # Store each step of the merge for animation
+            self.merge_steps.append(merged)
+
+        self.tree = heap[0]
+        self.generate_codes(self.tree, "")
+
+    def generate_codes(self, node, current_code):
+        if node is None:
+            return
+        if node.char is not None:
+            self.codes[node.char] = current_code
+        self.generate_codes(node.left, current_code + "0")
+        self.generate_codes(node.right, current_code + "1")
+
+# GUI Application
+class HuffmanApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Huffman Coding GUI")
+        
+        # Input Section
+        tk.Label(root, text="Enter Text:").pack()
+        self.text_area = scrolledtext.ScrolledText(root, height=5)
+        self.text_area.pack()
+        
+        # Buttons
+        tk.Button(root, text="Generate Huffman Tree", command=self.generate_huffman).pack()
+        tk.Button(root, text="Animate Tree Building", command=self.animate_tree).pack()
+        
+        # Output Section
+        self.output_area = scrolledtext.ScrolledText(root, height=10)
+        self.output_area.pack()
+
+        # Canvas for animation
+        self.canvas = tk.Canvas(root, width=800, height=600, bg="white")
+        self.canvas.pack()
+
+        self.huffman = None
+        self.current_step = 0
+        self.colors = ["red", "blue", "green", "purple", "orange", "brown", "teal", "pink", "yellow"]
+
+    def generate_huffman(self):
+        text = self.text_area.get("1.0", tk.END).strip()
+        if not text:
+            messagebox.showerror("Error", "Please enter text to encode.")
+            return
+        
+        self.huffman = HuffmanCoding(text)
+        self.huffman.build_tree()
+        
+        output = "Character Codes:\n"
+        for char, code in self.huffman.codes.items():
+            output += f"'{char}': {code}\n"
+        
+        self.output_area.delete("1.0", tk.END)
+        self.output_area.insert(tk.END, output)
+        
+    def animate_tree(self):
+        if not self.huffman:
+            messagebox.showerror("Error", "Generate the Huffman tree first.")
+            return
+
+        self.current_step = 0
+        self.update_canvas()
+
+    def update_canvas(self):
+        if self.current_step < len(self.huffman.merge_steps):
+            # Clear the canvas for each new step to prevent overlapping or repetition
+            self.canvas.delete("all")
+            
+            # Draw the tree for the current merge step
+            node = self.huffman.merge_steps[self.current_step]
+            self.draw_node(node, 400, 50, dx=100)  # Centered at the top
+
+            # Move to the next step
+            self.current_step += 1
+            self.root.after(1000, self.update_canvas)  # Update every 1000 ms (1 second)
+        else:
+            # After the last merge step, draw the final tree
+            self.canvas.delete("all")
+            self.draw_node(self.huffman.tree, 400, 50, dx=100)
+
+    def draw_node(self, node, x, y, dx):
+        if node is None:
+            return
+
+        # Choose a random color for each node
+        color = random.choice(self.colors)
+        label = f"{node.char or ''}:{node.freq}"
+        
+        # Draw the node with a circular shape and text inside
+        radius = 20
+        self.canvas.create_oval(x - radius, y - radius, x + radius, y + radius, fill=color, outline="black")
+        self.canvas.create_text(x, y, text=label, font=("Arial", 12), fill="white")
+
+        # Recursively draw left and right children with adjusted spacing
+        if node.left:
+            self.canvas.create_line(x, y, x - dx, y + 60, fill=color)
+            self.draw_node(node.left, x - dx, y + 60, dx / 2)
+        if node.right:
+            self.canvas.create_line(x, y, x + dx, y + 60, fill=color)
+            self.draw_node(node.right, x + dx, y + 60, dx / 2)
+
+# Main Program
+root = tk.Tk()
+app = HuffmanApp(root)
+root.mainloop()
